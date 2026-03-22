@@ -71,6 +71,41 @@ with st.sidebar:
     st.caption("Turn any image into a real-world GPS route")
     st.divider()
 
+    # Step 0: location search
+    st.markdown("**Search Location**")
+    search_col, btn_col = st.columns([3, 1])
+    with search_col:
+        location_query = st.text_input("Search", placeholder="City, address…", label_visibility="collapsed")
+    with btn_col:
+        search_clicked = st.button("Go", use_container_width=True)
+
+    if search_clicked and location_query:
+        try:
+            import requests as _req
+            resp = _req.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": location_query, "format": "json", "limit": 1},
+                headers={"User-Agent": "RouteArt/1.0"},
+                timeout=5,
+            )
+            results = resp.json()
+            if results:
+                st.session_state.start_lat = float(results[0]["lat"])
+                st.session_state.start_lon = float(results[0]["lon"])
+                st.session_state.anchors_latlon = None
+                st.session_state.route_coords = None
+                st.session_state.exports = None
+                st.session_state.fidelity_score = None
+                st.session_state.actual_distance = None
+                st.session_state.warning = None
+                st.rerun()
+            else:
+                st.error("Location not found")
+        except Exception as e:
+            st.error(f"Search failed: {e}")
+
+    st.divider()
+
     # Step 1: pin status
     st.markdown("**① Start Point**")
     if st.session_state.start_lat is not None:
@@ -78,7 +113,7 @@ with st.sidebar:
             f"📍 {st.session_state.start_lat:.5f}, {st.session_state.start_lon:.5f}"
         )
     else:
-        st.info("Click the map to set a start point")
+        st.info("Click the map to set a start point, or search above")
 
     st.divider()
 
@@ -272,6 +307,14 @@ m = folium.Map(
     tiles="CartoDB dark_matter",
     width="100%",
 )
+
+from folium.plugins import LocateControl
+LocateControl(
+    auto_start=False,
+    fly_to=True,
+    string_compass=True,
+    locateOptions={"enableHighAccuracy": True},
+).add_to(m)
 
 # Start pin
 if st.session_state.start_lat is not None:
