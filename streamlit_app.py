@@ -59,6 +59,7 @@ for key, default in [
     ("actual_distance", None),
     ("exports", None),
     ("warning", None),
+    ("image_bytes", None),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -137,8 +138,6 @@ with st.sidebar:
 
     img_tab, cam_tab = st.tabs(["Upload File", "Camera / Gallery"])
 
-    image_bytes = None
-
     with img_tab:
         uploaded_file = st.file_uploader(
             "Upload image",
@@ -146,14 +145,20 @@ with st.sidebar:
             label_visibility="collapsed",
         )
         if uploaded_file:
-            image_bytes = uploaded_file.read()
-            st.image(image_bytes, use_container_width=True, caption="Shape preview")
+            st.session_state.image_bytes = uploaded_file.read()
+            st.image(st.session_state.image_bytes, use_container_width=True, caption="Shape preview")
+        elif st.session_state.image_bytes:
+            st.image(st.session_state.image_bytes, use_container_width=True, caption="Shape preview")
 
     with cam_tab:
         camera_file = st.camera_input("Take photo or pick from gallery", label_visibility="collapsed")
         if camera_file:
-            image_bytes = camera_file.read()
-            st.image(image_bytes, use_container_width=True, caption="Shape preview")
+            st.session_state.image_bytes = camera_file.read()
+            st.image(st.session_state.image_bytes, use_container_width=True, caption="Shape preview")
+        elif st.session_state.image_bytes:
+            st.image(st.session_state.image_bytes, use_container_width=True, caption="Shape preview")
+
+    image_bytes = st.session_state.image_bytes
 
     st.divider()
 
@@ -255,7 +260,11 @@ if preview_clicked and image_bytes and st.session_state.start_lat is not None:
 # ---------------------------------------------------------------------------
 # Handle Generate
 # ---------------------------------------------------------------------------
-if generate_clicked and image_bytes and st.session_state.start_lat is not None:
+if generate_clicked and st.session_state.start_lat is None:
+    st.error("Set a start point first — click the map or search a location.")
+elif generate_clicked and not image_bytes:
+    st.error("Upload an image first.")
+elif generate_clicked and image_bytes and st.session_state.start_lat is not None:
     with st.spinner("Routing on street network… this may take 30-60 seconds on first run."):
         try:
             anchors, warning = run_image_pipeline(
