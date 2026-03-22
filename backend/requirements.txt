@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+python-multipart
+opencv-python-headless
+rembg
+numpy
+osmnx
+networkx
+shapely
+pyproj
+gpxpy
+simplekml
+rdp
+scipy
+redis
+python-dotenv

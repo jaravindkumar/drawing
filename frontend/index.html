@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RouteArt</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --panel: #1a1a1a;
+      --border: #2a2a2a;
+      --accent: #00e5ff;
+      --accent-dim: rgba(0,229,255,0.15);
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --panel-w: 360px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    #layout {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* ── Map ── */
+    #map {
+      flex: 1;
+      height: 100%;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: var(--panel-w);
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 20px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+
+    .sidebar-header p {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .step-badge {
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      font-size: 11px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .section-title span {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    /* Pin display */
+    #pin-info {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
+    #pin-info.set {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Mode buttons */
+    .mode-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Sliders */
+    .slider-row {
+      margin-bottom: 12px;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    .slider-label span:first-child { color: var(--text-muted); }
+    .slider-value { color: var(--accent); font-weight: 600; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Image upload */
+    #upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      position: relative;
+    }
+
+    #upload-area:hover, #upload-area.drag {
+      border-color: var(--accent);
+    }
+
+    #upload-area p {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    #upload-area .icon { font-size: 28px; margin-bottom: 6px; }
+
+    #file-input { display: none; }
+
+    #thumb-wrap {
+      margin-top: 10px;
+      display: none;
+      text-align: center;
+    }
+
+    #thumb-wrap img {
+      max-height: 100px;
+      max-width: 100%;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Action buttons */
+    .action-btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: 8px;
+    }
+
+    .action-btn:last-child { margin-bottom: 0; }
+
+    .btn-preview {
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-preview:hover:not(:disabled) {
+      background: var(--accent-dim);
+    }
+
+    .btn-generate {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-generate:hover:not(:disabled) {
+      background: #33eeff;
+    }
+
+    .action-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Results */
+    #results {
+      display: none;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .results-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .stat-label { color: var(--text-muted); }
+    .stat-value { color: var(--accent); font-weight: 600; }
+
+    /* Export buttons */
+    #exports {
+      display: none;
+      padding: 16px 20px;
+    }
+
+    .export-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .export-btn {
+      width: 100%;
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      transition: all 0.15s;
+      text-align: left;
+    }
+
+    .export-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Warning */
+    #warning-box {
+      display: none;
+      margin: 0 20px 12px;
+      padding: 8px 10px;
+      background: rgba(255,180,0,0.1);
+      border: 1px solid rgba(255,180,0,0.4);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #ffb400;
+    }
+
+    /* Loading overlay on map */
+    #loading {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: calc(50% - var(--panel-w) / 2);
+      transform: translate(-50%, -50%);
+      background: rgba(15,15,15,0.85);
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 20px 30px;
+      font-size: 14px;
+      color: var(--accent);
+      z-index: 999;
+      backdrop-filter: blur(4px);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--accent-dim);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div id="layout">
+  <div id="map"></div>
+
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h1>RouteArt</h1>
+      <p>Turn any image into a real-world GPS route</p>
+    </div>
+
+    <!-- Step 1: Pin -->
+    <div class="section">
+      <div class="section-title">
+        <div class="step-badge">1</div>
+        <span>Set Start Point</span>
+      </div>
+      <div id="pin-info">Click on the map to drop a start pin</div>
+    </div>
+
+    <!-- Step 2: Mode -->
+    <div class="section">
+      <div class="section-title">
+        <div class="step-badge">2</div>
+        <span>Activity Mode</span>
+      </div>
+      <div class="mode-btns">
+        <button class="mode-btn active" id="btn-run" onclick="setMode('run')">🏃 Run</button>
+        <button class="mode-btn" id="btn-cycle" onclick="setMode('cycle')">🚴 Cycle</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Sliders -->
+    <div class="section">
+      <div class="section-title">
+        <div class="step-badge">3</div>
+        <span>Shape Parameters</span>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Distance</span>
+          <span class="slider-value" id="dist-val">5 km</span>
+        </div>
+        <input type="range" id="slider-dist" min="1" max="30" value="5" step="0.5"
+               oninput="document.getElementById('dist-val').textContent = this.value + ' km'" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Search Radius</span>
+          <span class="slider-value" id="radius-val">2.0 km</span>
+        </div>
+        <input type="range" id="slider-radius" min="0.5" max="10" value="2" step="0.5"
+               oninput="document.getElementById('radius-val').textContent = parseFloat(this.value).toFixed(1) + ' km'" />
+      </div>
+
+      <div class="slider-row" style="margin-bottom:0">
+        <div class="slider-label">
+          <span>Rotation</span>
+          <span class="slider-value" id="rot-val">0°</span>
+        </div>
+        <input type="range" id="slider-rot" min="0" max="360" value="0" step="5"
+               oninput="document.getElementById('rot-val').textContent = this.value + '°'" />
+      </div>
+    </div>
+
+    <!-- Step 4: Image -->
+    <div class="section">
+      <div class="section-title">
+        <div class="step-badge">4</div>
+        <span>Upload Shape Image</span>
+      </div>
+      <div id="upload-area"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault(); this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <div class="icon">🖼</div>
+        <p>Click or drag &amp; drop an image</p>
+        <p style="margin-top:4px; font-size:11px">PNG, JPG, SVG, WebP</p>
+        <input type="file" id="file-input" accept="image/*" onchange="handleFileSelect(event)" />
+      </div>
+      <div id="thumb-wrap">
+        <img id="thumb" src="" alt="preview" />
+      </div>
+    </div>
+
+    <!-- Warning -->
+    <div id="warning-box"></div>
+
+    <!-- Action buttons -->
+    <div class="section">
+      <button class="action-btn btn-preview" id="btn-preview" onclick="doPreview()" disabled>
+        Preview Shape
+      </button>
+      <button class="action-btn btn-generate" id="btn-generate" onclick="doGenerate()" disabled>
+        Generate Route
+      </button>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="results-title">Results</div>
+      <div class="stat-row">
+        <span class="stat-label">Fidelity Score</span>
+        <span class="stat-value" id="stat-fidelity">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Actual Distance</span>
+        <span class="stat-value" id="stat-distance">—</span>
+      </div>
+    </div>
+
+    <!-- Exports -->
+    <div id="exports">
+      <div class="export-title">Export</div>
+      <button class="export-btn" id="btn-gmaps">🗺 Open in Google Maps</button>
+      <button class="export-btn" id="btn-kml">📥 Download KML</button>
+      <button class="export-btn" id="btn-gpx">📥 Download GPX</button>
+    </div>
+  </aside>
+</div>
+
+<!-- Loading indicator -->
+<div id="loading">
+  <span class="spinner"></span>
+  <span id="loading-msg">Processing…</span>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+const API = 'http://localhost:8000';
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let startLat = null, startLon = null;
+let mode = 'run';
+let imageB64 = null;
+let pinMarker = null;
+let lastExports = null;
+let lastGmapsUrl = null;
+
+// ---------------------------------------------------------------------------
+// Map init
+// ---------------------------------------------------------------------------
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: {
+      'osm': {
+        type: 'raster',
+        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        attribution: '© OpenStreetMap contributors',
+      }
+    },
+    layers: [{
+      id: 'osm',
+      type: 'raster',
+      source: 'osm',
+      paint: {
+        'raster-saturation': -0.6,
+        'raster-brightness-min': 0.0,
+        'raster-brightness-max': 0.35,
+      }
+    }]
+  },
+  center: [0, 20],
+  zoom: 2,
+});
+
+map.on('load', () => {
+  // Shape preview source + layer
+  map.addSource('preview', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+  map.addLayer({
+    id: 'preview-line',
+    type: 'line',
+    source: 'preview',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#888888',
+      'line-width': 2,
+      'line-dasharray': [4, 3],
+    }
+  });
+
+  // Route source + layer
+  map.addSource('route', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+  map.addLayer({
+    id: 'route-line',
+    type: 'line',
+    source: 'route',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#00e5ff',
+      'line-width': 3,
+    }
+  });
+});
+
+// Click to set start pin
+map.on('click', (e) => {
+  startLat = e.lngLat.lat;
+  startLon = e.lngLat.lng;
+
+  if (pinMarker) pinMarker.remove();
+
+  const el = document.createElement('div');
+  el.style.cssText = `
+    width: 16px; height: 16px;
+    background: #00e5ff;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 8px #00e5ff;
+  `;
+  pinMarker = new maplibregl.Marker({ element: el })
+    .setLngLat([startLon, startLat])
+    .addTo(map);
+
+  const pinInfo = document.getElementById('pin-info');
+  pinInfo.textContent = `📍 ${startLat.toFixed(5)}, ${startLon.toFixed(5)}`;
+  pinInfo.classList.add('set');
+
+  checkReady();
+});
+
+// ---------------------------------------------------------------------------
+// UI helpers
+// ---------------------------------------------------------------------------
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-run').classList.toggle('active', m === 'run');
+  document.getElementById('btn-cycle').classList.toggle('active', m === 'cycle');
+}
+
+function checkReady() {
+  const ready = startLat !== null && imageB64 !== null;
+  document.getElementById('btn-preview').disabled = !ready;
+  document.getElementById('btn-generate').disabled = !ready;
+}
+
+function showWarning(msg) {
+  const box = document.getElementById('warning-box');
+  if (msg) {
+    box.textContent = '⚠ ' + msg;
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function showLoading(msg) {
+  document.getElementById('loading-msg').textContent = msg;
+  document.getElementById('loading').style.display = 'block';
+}
+
+function hideLoading() {
+  document.getElementById('loading').style.display = 'none';
+}
+
+function getParams() {
+  return {
+    image_b64: imageB64,
+    start_lat: startLat,
+    start_lon: startLon,
+    distance_m: parseFloat(document.getElementById('slider-dist').value) * 1000,
+    radius_m: parseFloat(document.getElementById('slider-radius').value) * 1000,
+    bearing_deg: parseFloat(document.getElementById('slider-rot').value),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// File handling
+// ---------------------------------------------------------------------------
+function handleFileSelect(evt) {
+  const file = evt.target.files[0];
+  if (file) loadFile(file);
+}
+
+function handleDrop(evt) {
+  evt.preventDefault();
+  document.getElementById('upload-area').classList.remove('drag');
+  const file = evt.dataTransfer.files[0];
+  if (file) loadFile(file);
+}
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    // Extract base64 part
+    imageB64 = dataUrl.split(',')[1];
+
+    // Show thumbnail
+    const thumbWrap = document.getElementById('thumb-wrap');
+    const thumb = document.getElementById('thumb');
+    thumb.src = dataUrl;
+    thumbWrap.style.display = 'block';
+
+    checkReady();
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---------------------------------------------------------------------------
+// Preview
+// ---------------------------------------------------------------------------
+async function doPreview() {
+  if (!startLat || !imageB64) return;
+  showLoading('Extracting shape…');
+  showWarning(null);
+
+  try {
+    const body = getParams();
+    const res = await fetch(`${API}/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Preview failed');
+    }
+
+    const data = await res.json();
+    if (data.warning) showWarning(data.warning);
+
+    // Draw dashed shape overlay
+    const anchors = data.anchors_latlon; // [[lat,lon],...]
+    const coords = anchors.map(([lat, lon]) => [lon, lat]); // GeoJSON [lon,lat]
+    // Close the loop
+    if (coords.length > 1) coords.push(coords[0]);
+
+    map.getSource('preview').setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: coords },
+        properties: {}
+      }]
+    });
+
+    // Fit map to shape
+    const lngs = anchors.map(a => a[1]);
+    const lats = anchors.map(a => a[0]);
+    map.fitBounds(
+      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { padding: 80, maxZoom: 15 }
+    );
+
+  } catch (e) {
+    alert('Preview error: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Generate
+// ---------------------------------------------------------------------------
+async function doGenerate() {
+  if (!startLat || !imageB64) return;
+  showLoading('Routing on street network… (this may take 30-60 s)');
+  showWarning(null);
+
+  // Hide old results
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('exports').style.display = 'none';
+
+  try {
+    const body = { ...getParams(), mode, fidelity_w: 1.0 };
+    const res = await fetch(`${API}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Generate failed');
+    }
+
+    const data = await res.json();
+    if (data.warning) showWarning(data.warning);
+
+    // Draw route
+    map.getSource('route').setData(data.route_geojson);
+    // Clear preview
+    map.getSource('preview').setData({ type: 'FeatureCollection', features: [] });
+
+    // Fit to route
+    const coords = data.route_geojson.geometry.coordinates;
+    if (coords.length) {
+      const lngs = coords.map(c => c[0]);
+      const lats = coords.map(c => c[1]);
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: 60, maxZoom: 15 }
+      );
+    }
+
+    // Results
+    document.getElementById('stat-fidelity').textContent = data.fidelity_score.toFixed(1) + '%';
+    const distKm = (data.actual_distance / 1000).toFixed(2);
+    document.getElementById('stat-distance').textContent = distKm + ' km';
+    document.getElementById('results').style.display = 'block';
+
+    // Exports
+    lastExports = data.exports;
+    lastGmapsUrl = data.exports.google_maps_url;
+
+    document.getElementById('btn-gmaps').onclick = () => window.open(lastGmapsUrl, '_blank');
+
+    document.getElementById('btn-kml').onclick = () => {
+      downloadB64(lastExports.kml_b64, 'routeart.kml', 'application/vnd.google-earth.kml+xml');
+    };
+
+    document.getElementById('btn-gpx').onclick = () => {
+      downloadB64(lastExports.gpx_b64, 'routeart.gpx', 'application/gpx+xml');
+    };
+
+    document.getElementById('exports').style.display = 'block';
+
+  } catch (e) {
+    alert('Generate error: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Download helper
+// ---------------------------------------------------------------------------
+function downloadB64(b64, filename, mimeType) {
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  const blob = new Blob([arr], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
