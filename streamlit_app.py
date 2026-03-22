@@ -134,17 +134,26 @@ with st.sidebar:
 
     # Step 4: image upload
     st.markdown("**④ Shape Image**")
-    uploaded_file = st.file_uploader(
-        "Upload image",
-        type=["png", "jpg", "jpeg", "webp", "gif"],
-        label_visibility="collapsed",
-    )
 
-    if uploaded_file:
-        image_bytes = uploaded_file.read()
-        st.image(image_bytes, use_container_width=True, caption="Shape preview")
-    else:
-        image_bytes = None
+    img_tab, cam_tab = st.tabs(["Upload File", "Camera / Gallery"])
+
+    image_bytes = None
+
+    with img_tab:
+        uploaded_file = st.file_uploader(
+            "Upload image",
+            type=["png", "jpg", "jpeg", "webp", "gif"],
+            label_visibility="collapsed",
+        )
+        if uploaded_file:
+            image_bytes = uploaded_file.read()
+            st.image(image_bytes, use_container_width=True, caption="Shape preview")
+
+    with cam_tab:
+        camera_file = st.camera_input("Take photo or pick from gallery", label_visibility="collapsed")
+        if camera_file:
+            image_bytes = camera_file.read()
+            st.image(image_bytes, use_container_width=True, caption="Shape preview")
 
     st.divider()
 
