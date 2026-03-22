@@ -392,9 +392,19 @@ if st.session_state.route_coords:
 # ---------------------------------------------------------------------------
 # Render map & capture clicks
 # ---------------------------------------------------------------------------
-st.markdown("### 🗺 Map  —  click to set start point")
+if st.session_state.route_coords:
+    st.markdown("### Route generated — scroll down for downloads")
+else:
+    st.markdown("### Map  —  tap to set start point")
+
+# Fit map to route bounds
+if st.session_state.route_coords:
+    lats = [c[0] for c in st.session_state.route_coords]
+    lons = [c[1] for c in st.session_state.route_coords]
+    m.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]])
+
 _map_key = f"map_{bool(st.session_state.route_coords)}_{bool(st.session_state.anchors_latlon)}_{st.session_state.start_lat}"
-map_output = st_folium(m, use_container_width=True, height=620, returned_objects=["last_clicked"], key=_map_key)
+map_output = st_folium(m, use_container_width=True, height=500, returned_objects=["last_clicked"], key=_map_key)
 
 # Update start point from click
 if map_output and map_output.get("last_clicked"):
@@ -411,4 +421,48 @@ if map_output and map_output.get("last_clicked"):
         st.session_state.fidelity_score = None
         st.session_state.actual_distance = None
         st.session_state.warning = None
+        st.session_state.image_bytes = None
         st.rerun()
+
+# ---------------------------------------------------------------------------
+# Results & exports below the map (always visible on mobile)
+# ---------------------------------------------------------------------------
+if st.session_state.route_coords:
+    st.divider()
+
+    c1, c2 = st.columns(2)
+    c1.metric("Fidelity", f"{st.session_state.fidelity_score:.1f}%")
+    dist_km = st.session_state.actual_distance / 1000
+    c2.metric("Distance", f"{dist_km:.2f} km")
+
+    if st.session_state.warning:
+        st.warning(st.session_state.warning)
+
+    st.divider()
+    st.markdown("#### Download & Open")
+
+    exports = st.session_state.exports or {}
+
+    gmaps_url = exports.get("google_maps_url", "")
+    if gmaps_url:
+        st.link_button("Open in Google Maps", gmaps_url, use_container_width=True, type="primary")
+
+    col_kml, col_gpx = st.columns(2)
+    kml_b64 = exports.get("kml_b64", "")
+    if kml_b64:
+        col_kml.download_button(
+            "Download KML",
+            data=base64.b64decode(kml_b64),
+            file_name="routeart.kml",
+            mime="application/vnd.google-earth.kml+xml",
+            use_container_width=True,
+        )
+    gpx_b64 = exports.get("gpx_b64", "")
+    if gpx_b64:
+        col_gpx.download_button(
+            "Download GPX",
+            data=base64.b64decode(gpx_b64),
+            file_name="routeart.gpx",
+            mime="application/gpx+xml",
+            use_container_width=True,
+        )
