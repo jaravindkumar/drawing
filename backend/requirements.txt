@@ -14,3 +14,6 @@ rdp
 scipy
 redis
 python-dotenv
+streamlit
+streamlit-folium
+folium
