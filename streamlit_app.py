@@ -254,8 +254,10 @@ if preview_clicked and image_bytes and st.session_state.start_lat is not None:
             st.session_state.exports = None
             st.session_state.fidelity_score = None
             st.session_state.actual_distance = None
+            st.rerun()
         except Exception as e:
             st.error(f"Preview failed: {e}")
+            st.exception(e)
 
 # ---------------------------------------------------------------------------
 # Handle Generate
@@ -295,8 +297,10 @@ elif generate_clicked and image_bytes and st.session_state.start_lat is not None
             st.session_state.exports = exports
             st.session_state.warning = warning
             st.session_state.anchors_latlon = None  # hide preview once route is shown
+            st.rerun()
         except Exception as e:
             st.error(f"Generate failed: {e}")
+            st.exception(e)
 
 # ---------------------------------------------------------------------------
 # Build Folium map
@@ -389,7 +393,8 @@ if st.session_state.route_coords:
 # Render map & capture clicks
 # ---------------------------------------------------------------------------
 st.markdown("### 🗺 Map  —  click to set start point")
-map_output = st_folium(m, use_container_width=True, height=620, returned_objects=["last_clicked"])
+_map_key = f"map_{bool(st.session_state.route_coords)}_{bool(st.session_state.anchors_latlon)}_{st.session_state.start_lat}"
+map_output = st_folium(m, use_container_width=True, height=620, returned_objects=["last_clicked"], key=_map_key)
 
 # Update start point from click
 if map_output and map_output.get("last_clicked"):
