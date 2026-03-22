@@ -10,15 +10,21 @@ Steps:
 
 import numpy as np
 import cv2
-from rembg import remove
 
 
-def process_image(image_bytes: bytes) -> np.ndarray:
+def _get_rembg_session():
+    """Lazy-load rembg session; cached by the caller via st.cache_resource."""
+    from rembg import new_session
+    return new_session("u2net")
+
+
+def process_image(image_bytes: bytes, session=None) -> np.ndarray:
     """
     Accept raw image bytes, return a binary mask (uint8, values 0 or 255).
+    Pass a pre-loaded rembg session to avoid reloading the model on every call.
     """
-    # Remove background via rembg
-    output_bytes = remove(image_bytes)
+    from rembg import remove
+    output_bytes = remove(image_bytes, session=session)
 
     # Decode the RGBA PNG that rembg returns
     nparr = np.frombuffer(output_bytes, np.uint8)

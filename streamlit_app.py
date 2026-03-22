@@ -17,7 +17,7 @@ import folium
 import streamlit as st
 from streamlit_folium import st_folium
 
-from pipeline.image_processor import process_image
+from pipeline.image_processor import process_image, _get_rembg_session
 from pipeline.vector_extractor import extract_anchors
 from pipeline.shape_scaler import scale_anchors
 from pipeline.graph_router import build_route, compute_actual_distance
@@ -41,6 +41,11 @@ st.markdown("""
   .metric-label { color: #888 !important; }
 </style>
 """, unsafe_allow_html=True)
+
+
+@st.cache_resource(show_spinner="Loading background removal model…")
+def _cached_rembg_session():
+    return _get_rembg_session()
 
 # ---------------------------------------------------------------------------
 # Session state defaults
@@ -166,7 +171,7 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 
 def run_image_pipeline(image_bytes, start_lat, start_lon, distance_m, radius_m, bearing):
-    binary_mask = process_image(image_bytes)
+    binary_mask = process_image(image_bytes, session=_cached_rembg_session())
     norm_anchors = extract_anchors(binary_mask)
     warning = None
     if len(norm_anchors) < 10:
