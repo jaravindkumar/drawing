@@ -47,6 +47,36 @@ st.markdown("""
 def _cached_rembg_session():
     return _get_rembg_session()
 
+
+@st.cache_data(show_spinner=False)
+def _build_preview_image(image_bytes: bytes) -> tuple:
+    """Return (png_bytes, n_anchors) — silhouette with contour overlay."""
+    from PIL import Image, ImageDraw
+    import numpy as np
+
+    binary_mask = process_image(image_bytes, session=_cached_rembg_session())
+    norm_anchors = extract_anchors(binary_mask)
+    n = len(norm_anchors)
+
+    h, w = binary_mask.shape[:2]
+    rgba = np.zeros((h, w, 4), dtype=np.uint8)
+    rgba[binary_mask > 0] = [30, 30, 30, 255]
+    rgba[binary_mask == 0] = [10, 10, 10, 200]
+    img = Image.fromarray(rgba, "RGBA")
+    draw = ImageDraw.Draw(img)
+
+    pixel_pts = [(int(x * (w - 1)), int(y * (h - 1))) for x, y in norm_anchors]
+    if len(pixel_pts) >= 2:
+        draw.line(pixel_pts + [pixel_pts[0]], fill=(0, 229, 255, 255), width=max(2, w // 120))
+    dot_r = max(4, w // 60)
+    for px, py in pixel_pts:
+        draw.ellipse([px - dot_r, py - dot_r, px + dot_r, py + dot_r], fill=(0, 229, 255, 255))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue(), n
+
+
 # ---------------------------------------------------------------------------
 # Session state defaults
 # ---------------------------------------------------------------------------
@@ -390,12 +420,23 @@ if st.session_state.route_coords:
     ).add_to(m)
 
 # ---------------------------------------------------------------------------
+# Vectorized shape preview — shown as soon as an image is uploaded
+# ---------------------------------------------------------------------------
+if image_bytes and not st.session_state.route_coords:
+    with st.spinner("Analyzing shape…"):
+        try:
+            preview_png, n_anchors = _build_preview_image(image_bytes)
+            st.image(preview_png, caption=f"Shape detected — {n_anchors} anchor points", use_container_width=True)
+        except Exception as e:
+            st.error(f"Could not process image: {e}")
+
+# ---------------------------------------------------------------------------
 # Render map & capture clicks
 # ---------------------------------------------------------------------------
 if st.session_state.route_coords:
-    st.markdown("### Route generated — scroll down for downloads")
+    st.markdown("### Route — scroll down for downloads & Google Maps link")
 else:
-    st.markdown("### Map  —  tap to set start point")
+    st.markdown("### Map — tap to set start point")
 
 # Fit map to route bounds
 if st.session_state.route_coords:
@@ -421,7 +462,6 @@ if map_output and map_output.get("last_clicked"):
         st.session_state.fidelity_score = None
         st.session_state.actual_distance = None
         st.session_state.warning = None
-        st.session_state.image_bytes = None
         st.rerun()
 
 # ---------------------------------------------------------------------------
