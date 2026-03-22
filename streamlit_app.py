@@ -106,12 +106,15 @@ with st.sidebar:
     )
 
     if uploaded_file:
-        st.image(uploaded_file, use_container_width=True, caption="Shape preview")
+        image_bytes = uploaded_file.read()
+        st.image(image_bytes, use_container_width=True, caption="Shape preview")
+    else:
+        image_bytes = None
 
     st.divider()
 
     # Action buttons
-    can_act = st.session_state.start_lat is not None and uploaded_file is not None
+    can_act = st.session_state.start_lat is not None and image_bytes is not None
 
     col_prev, col_gen = st.columns(2)
     with col_prev:
@@ -185,10 +188,9 @@ def run_image_pipeline(image_bytes, start_lat, start_lon, distance_m, radius_m, 
 # ---------------------------------------------------------------------------
 # Handle Preview
 # ---------------------------------------------------------------------------
-if preview_clicked and uploaded_file and st.session_state.start_lat is not None:
+if preview_clicked and image_bytes and st.session_state.start_lat is not None:
     with st.spinner("Extracting shape contour…"):
         try:
-            image_bytes = uploaded_file.read()
             anchors, warning = run_image_pipeline(
                 image_bytes,
                 st.session_state.start_lat,
@@ -209,10 +211,9 @@ if preview_clicked and uploaded_file and st.session_state.start_lat is not None:
 # ---------------------------------------------------------------------------
 # Handle Generate
 # ---------------------------------------------------------------------------
-if generate_clicked and uploaded_file and st.session_state.start_lat is not None:
+if generate_clicked and image_bytes and st.session_state.start_lat is not None:
     with st.spinner("Routing on street network… this may take 30-60 seconds on first run."):
         try:
-            image_bytes = uploaded_file.read()
             anchors, warning = run_image_pipeline(
                 image_bytes,
                 st.session_state.start_lat,
